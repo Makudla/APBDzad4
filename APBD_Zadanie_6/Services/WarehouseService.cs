@@ -63,6 +63,7 @@ namespace Zadanie5.Services
             reader = await cmd.ExecuteReaderAsync();
 
             if (!reader.HasRows) throw new Exception();
+            
             await reader.ReadAsync();
             cmd.Parameters.Clear();
 
@@ -72,9 +73,44 @@ namespace Zadanie5.Services
             try {
                 cmd.CommandText = "UPDATE [Order] SET FullfilledAt = @CreatedAt WHERE IdOrder = @IdOrder";
                 cmd.Parameters.AddWithValue("CreatedAt", productWarehouse.CreatedAt);
+                cmd.Parameters.AddWithValue("IdOrder", idOrder );
 
+                int rowsUpdated = await cmd.ExecuteNonQueryAsync();
+
+                if( rowsUpdated < 1 ) throw new Exception();
+
+                cmd.Parameters.Clear();
+
+                cmd.CommandText = "INSERT INTO Product_Warehouse(IdWarehouse, IdProduct, Amount, Price, CreatedAt " +
+                    $"VALUES(@IdWarehouse, @IdProduct, @IdOrder, @Amount, @Amount*{price}, @CreatedAt)";
+                cmd.Parameters.AddWithValue("IdWarehouse", productWarehouse.IdWarehouse);
+                cmd.Parameters.AddWithValue("IdProduct", productWarehouse.IdProduct);
+                cmd.Parameters.AddWithValue("IdOrder", idOrder);
+                cmd.Parameters.AddWithValue("Amount", productWarehouse.Amount);
+                cmd.Parameters.AddWithValue("CreatedAt", productWarehouse.CreatedAt);
+                
+                int rowsInserted = await cmd.ExecuteNonQueryAsync();
+                if (rowsInserted < 1) throw new Exception();
+
+                await transaction.CommitAsync();
+            }
+            catch(Exception)
+            {
+                await transaction.RollbackAsync();
+                throw new Exception();
             }
 
+            cmd.Parameters.Clear();
+
+            cmd.CommandText = "SELECT TOP 1 IdProductWarehouse FROM Product_Warehouse ORDER BY IdProductWarehouse DESC";
+
+            reader = await cmd.ExecuteReaderAsync();
+            await reader.ReadAsync();
+
+            int idProductWarehouse = int.Parse(reader["IdProductWarehouse"].ToString());
+            await reader.CloseAsync();
+
+            return idProductWarehouse;
         }
     }
 }
